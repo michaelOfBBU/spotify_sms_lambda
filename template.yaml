@@ -1,0 +1,78 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  spotify_sms_lambda
+  SAM Template for spotify_sms_lambda
+
+Metadata:
+  AWS::ServerlessRepo::Application:
+    Name: 'SMS-Spotify-Controller'
+    Description: This application responds to an incoming SMS with Spotify playlist update.
+    Author: Michael Armstrong
+    SpdxLicenseId: mit-0
+    LicenseUrl: license.txt
+    ReadmeUrl: README.md
+    Labels: ['SMS', 'Spotify', 'pinpoint', 'lambda', 'python']
+    HomePageUrl: https://github.com/michaelOfBBU/spotify_sms_lambda.git
+    SemanticVersion: 1.0.0
+    SourceCodeUrl: https://github.com/michaelOfBBU/spotify_sms_lambda.git
+
+Parameters:
+  ClientId:
+    Type: String
+    Default: 'Spotify Client ID'
+    Description: (Required) Spotify Client ID
+    AllowedPattern: ^[A-Za-z0-9-]+$
+    ConstraintDescription: 'Required parameter.'
+  ApplicationId:
+    Type: String
+    Default: 'PinpointApplicationId'
+    Description: (Required) Pinpoint application ID (project ID)
+    AllowedPattern: ^[A-Za-z0-9-]+$
+    ConstraintDescription: 'Required parameter.'
+
+# More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
+Globals:
+  Function:
+    Timeout: 10
+
+Resources:
+  spotifySMSResponderFunction:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      CodeUri: spotify_sms_responder/
+      Handler: app.lambdaHandler
+      Runtime: python3.8
+      Environment:
+        Variables:
+          ApplicationId: !Ref ApplicationId
+          ClientId: !Ref ClientId     
+      Policies:
+      - Statement:
+        - Sid: PinpointAccess
+          Effect: Allow
+          Action:
+          - mobiletargeting:*
+          Resource: '*'
+        - Sid: PinpointSNStopic
+          Effect: Allow
+          Action:
+            - sns:*
+          Resource: !Ref smsResponderIncomingSNSTopic
+      Events:
+        incomingSNS:
+          #SNS queue where Pinpoint sends incoming text messages
+          Type: SNS
+          Properties:
+            Topic:
+              Ref: smsResponderIncomingSNSTopic
+  smsResponderIncomingSNSTopic:
+    Type: 'AWS::SNS::Topic'
+
+Outputs:
+  spotifySMSResponderFunction:
+    Description: "Lambda Function ARN"
+    Value: !GetAtt spotifySMSResponderFunction.Arn
+  spotifySMSResponderFunctionIAMRole:
+    Description: "Implicit IAM Role created for function"
+    Value: !GetAtt spotifySMSResponderFunction_iam_role.Arn
